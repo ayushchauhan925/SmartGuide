@@ -1,0 +1,9 @@
+{
+  "name": "smartguide2",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npx tsx watch src/index.ts",
+    "dev:frontend": "cd frontend && npx vite",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  }
+}

@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  editor
+  viewer
+}
+
+enum ArtefactStatus {
+  active
+  inactive
+  draft
+}
+
+model User {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(viewer)
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  name        String     @unique
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  artefacts   Artefact[]
+
+  @@map("categories")
+}
+
+model Location {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  type        String?
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  artefacts   Artefact[]
+
+  @@map("locations")
+}
+
+model Artefact {
+  id             String         @id @default(auto()) @map("_id") @db.ObjectId
+  uniquePublicId String         @unique @map("unique_public_id")
+  title          String
+  description    String?
+  metadata       Json?
+  categoryId     String?        @map("category_id") @db.ObjectId
+  locationId     String?        @map("location_id") @db.ObjectId
+  status         ArtefactStatus @default(active)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  category Category?       @relation(fields: [categoryId], references: [id])
+  location Location?       @relation(fields: [locationId], references: [id])
+  images   ArtefactImage[]
+  audio    ArtefactAudio?
+  qrCode   QrCode?
+
+  @@map("artefacts")
+}
+
+model ArtefactImage {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  artefactId   String   @map("artefact_id") @db.ObjectId
+  storagePath  String   @map("storage_path")
+  imageUrl     String   @map("image_url")
+  altText      String?  @map("alt_text")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id])
+
+  @@map("artefact_images")
+}
+
+model ArtefactAudio {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  artefactId  String   @unique @map("artefact_id") @db.ObjectId
+  storagePath String   @map("storage_path")
+  audioUrl    String   @map("audio_url")
+  duration    Int?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id])
+
+  @@map("artefact_audio")
+}
+
+model QrCode {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  artefactId      String    @unique @map("artefact_id") @db.ObjectId
+  uniqueShortCode String    @unique @map("unique_short_code")
+  publicUrl       String    @unique @map("public_url")
+  qrImagePath     String?   @map("qr_image_path")
+  isActive        Boolean   @default(true) @map("is_active")
+  scanCount       Int       @default(0) @map("scan_count")
+  lastScannedAt   DateTime? @map("last_scanned_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id])
+
+  @@map("qr_codes")
+}
+
+model AuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String?  @map("user_id") @db.ObjectId
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  changes    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
