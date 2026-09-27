@@ -1,6 +1,6 @@
 # SmartGuide
 
-A QR-based Museum & Library Information System. Staff manage artefacts through a secure admin panel; visitors scan a QR code to instantly view rich content — images, descriptions, audio guides — on any device, no app required.
+SmartGuide is a QR-based Museum & Library Information System that makes artefact information easily accessible to visitors. Staff can manage artefacts, images, audio guides, categories, locations, and QR codes through a secure admin panel, while visitors can simply scan a QR code to view detailed information instantly on any device without installing an app.
 
 ---
 
