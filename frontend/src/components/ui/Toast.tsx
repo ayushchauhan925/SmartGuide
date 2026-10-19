@@ -1,60 +1,83 @@
-import { useState, useCallback, useEffect } from "react";
-import { X, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { CheckCircle2, XCircle, Info, X } from "lucide-react";
 
 type ToastType = "success" | "error" | "info";
 
-interface ToastItem { id: number; message: string; type: ToastType; }
-
-let _counter = 0;
-let _add: ((msg: string, type?: ToastType) => void) | null = null;
-
-export function toast(message: string, type: ToastType = "success") {
-  _add?.(message, type);
+interface Toast {
+  id: string;
+  message: string;
+  type: ToastType;
 }
 
-const config: Record<ToastType, { icon: React.ReactNode; color: string; border: string }> = {
-  success: { icon: <CheckCircle size={15} />, color: "#86EFAC", border: "rgba(134,239,172,0.2)" },
-  error:   { icon: <AlertCircle size={15} />, color: "#FCA5A5", border: "rgba(252,165,165,0.2)" },
-  info:    { icon: <Info size={15} />, color: "#93C5FD", border: "rgba(147,197,253,0.2)" },
+interface ToastContextValue {
+  toast: (message: string, type?: ToastType) => void;
+}
+
+const ToastContext = createContext<ToastContextValue | null>(null);
+
+const ICON = {
+  success: CheckCircle2,
+  error: XCircle,
+  info: Info,
 };
 
-export function ToastContainer() {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
+const STYLES: Record<ToastType, string> = {
+  success: "bg-white border-stone-200 shadow-stone-200/60",
+  error:   "bg-white border-stone-200 shadow-stone-200/60",
+  info:    "bg-white border-stone-200 shadow-stone-200/60",
+};
 
-  const add = useCallback((message: string, type: ToastType = "success") => {
-    const id = ++_counter;
+const ICON_STYLES: Record<ToastType, string> = {
+  success: "text-emerald-600",
+  error:   "text-red-600",
+  info:    "text-sky-600",
+};
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const toast = useCallback((message: string, type: ToastType = "success") => {
+    const id = Math.random().toString(36).slice(2);
     setToasts((p) => [...p, { id, message, type }]);
-    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3800);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 4000);
   }, []);
 
-  useEffect(() => { _add = add; return () => { _add = null; }; }, [add]);
-
-  if (!toasts.length) return null;
+  const dismiss = (id: string) => setToasts((p) => p.filter((t) => t.id !== id));
 
   return (
-    <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8 }}>
-      {toasts.map((t) => {
-        const c = config[t.type];
-        return (
-          <div key={t.id} className="fade-in" style={{
-            display: "flex", alignItems: "center", gap: 10,
-            padding: "11px 14px", borderRadius: 10, minWidth: 280, maxWidth: 380,
-            background: "rgba(17,15,12,0.95)", backdropFilter: "blur(12px)",
-            border: `1px solid ${c.border}`,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.24)",
-            color: "#F0EDE8", fontSize: 13.5,
-          }}>
-            <span style={{ color: c.color, flexShrink: 0 }}>{c.icon}</span>
-            <span style={{ flex: 1, lineHeight: 1.4 }}>{t.message}</span>
-            <button
-              onClick={() => setToasts((p) => p.filter((x) => x.id !== t.id))}
-              style={{ background: "none", border: "none", color: "#4A4440", cursor: "pointer", padding: 2, display: "flex", flexShrink: 0 }}
+    <ToastContext.Provider value={{ toast }}>
+      {children}
+      <div
+        className="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none"
+        aria-live="polite"
+        aria-label="Notifications"
+      >
+        {toasts.map((t) => {
+          const Icon = ICON[t.type];
+          return (
+            <div
+              key={t.id}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg pointer-events-auto min-w-[260px] max-w-[380px] ${STYLES[t.type]}`}
             >
-              <X size={13} />
-            </button>
-          </div>
-        );
-      })}
-    </div>
+              <Icon className={`h-4 w-4 shrink-0 ${ICON_STYLES[t.type]}`} />
+              <span className="flex-1 text-sm text-stone-800 font-medium">{t.message}</span>
+              <button
+                onClick={() => dismiss(t.id)}
+                aria-label="Dismiss"
+                className="text-stone-400 hover:text-stone-700 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </ToastContext.Provider>
   );
+}
+
+export function useToast() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error("useToast must be used within ToastProvider");
+  return ctx;
 }

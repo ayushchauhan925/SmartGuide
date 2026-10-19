@@ -1,37 +1,54 @@
-import { Router, Response } from "express";
-import { prisma } from "../lib/prisma";
-import { requireAuth, AuthRequest, getIp } from "../middleware/auth";
-import { logAuditEvent } from "../lib/audit";
+import { Router } from "express";
+import { UserRole } from "@prisma/client";
+import { prisma } from "../lib/prisma.js";
+import { apiError, getIp, intParam, requireAuth } from "../lib/http.js";
+import { logAuditEvent } from "../lib/audit.js";
 
-const router = Router();
+export const categoriesRouter = Router();
 
-router.get("/", requireAuth(), async (req: AuthRequest, res: Response): Promise<void> => {
-  const categories = await prisma.category.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { artefacts: true } } } });
+categoriesRouter.get("/", requireAuth(), async (_req, res) => {
+  const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
   res.json({ categories });
 });
 
-router.post("/", requireAuth("editor"), async (req: AuthRequest, res: Response): Promise<void> => {
-  const { name, description } = req.body ?? {};
-  if (!name?.trim()) { res.status(422).json({ error: { message: "Name is required", code: "VALIDATION_ERROR" } }); return; }
-  const category = await prisma.category.create({ data: { name: name.trim(), description: description?.trim() ?? null } });
-  await logAuditEvent({ userId: req.user!.userId, action: "create", entityType: "category", entityId: category.id, changes: { name }, ipAddress: getIp(req) });
+categoriesRouter.post("/", requireAuth(UserRole.editor), async (req, res) => {
+  const body = (req.body ?? {}) as { name?: string; description?: string };
+  if (!body.name?.trim()) return apiError(res, "Name is required", "VALIDATION_ERROR", 422);
+
+  const existing = await prisma.category.findUnique({ where: { name: body.name.trim() } });
+  if (existing) return apiError(res, "Category already exists", "CONFLICT", 409);
+
+  const category = await prisma.category.create({
+    data: { name: body.name.trim(), description: body.description?.trim() ?? null },
+  });
+  await logAuditEvent({ userId: req.user!.userId, action: "create", entityType: "category", entityId: category.id, ipAddress: getIp(req) });
   res.status(201).json({ category });
 });
 
-router.put("/:id", requireAuth("editor"), async (req: AuthRequest, res: Response): Promise<void> => {
-  const id = req.params.id;
-  const { name, description } = req.body ?? {};
-  if (!name?.trim()) { res.status(422).json({ error: { message: "Name is required", code: "VALIDATION_ERROR" } }); return; }
-  const category = await prisma.category.update({ where: { id }, data: { name: name.trim(), description: description?.trim() ?? null } });
-  await logAuditEvent({ userId: req.user!.userId, action: "update", entityType: "category", entityId: id, changes: { name }, ipAddress: getIp(req) });
+categoriesRouter.put("/:id", requireAuth(UserRole.editor), async (req, res) => {
+  const numId = intParam(req);
+  const body = (req.body ?? {}) as { name?: string; description?: string };
+
+  const existing = await prisma.category.findUnique({ where: { id: numId } });
+  if (!existing) return apiError(res, "Category not found", "NOT_FOUND", 404);
+
+  const category = await prisma.category.update({
+    where: { id: numId },
+    data: {
+      ...(body.name?.trim() ? { name: body.name.trim() } : {}),
+      ...(body.description !== undefined ? { description: body.description.trim() || null } : {}),
+    },
+  });
+  await logAuditEvent({ userId: req.user!.userId, action: "update", entityType: "category", entityId: numId, ipAddress: getIp(req) });
   res.json({ category });
 });
 
-router.delete("/:id", requireAuth("editor"), async (req: AuthRequest, res: Response): Promise<void> => {
-  const id = req.params.id;
-  await prisma.category.delete({ where: { id } });
-  await logAuditEvent({ userId: req.user!.userId, action: "delete", entityType: "category", entityId: id, ipAddress: getIp(req) });
+categoriesRouter.delete("/:id", requireAuth(UserRole.editor), async (req, res) => {
+  const numId = intParam(req);
+  const existing = await prisma.category.findUnique({ where: { id: numId } });
+  if (!existing) return apiError(res, "Category not found", "NOT_FOUND", 404);
+
+  await prisma.category.delete({ where: { id: numId } });
+  await logAuditEvent({ userId: req.user!.userId, action: "delete", entityType: "category", entityId: numId, ipAddress: getIp(req) });
   res.json({ success: true });
 });
-
-export default router;

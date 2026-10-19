@@ -1,31 +1,29 @@
-import { Router, Response } from "express";
-import { prisma } from "../lib/prisma";
-import { requireAuth, AuthRequest } from "../middleware/auth";
+import { Router } from "express";
+import { prisma } from "../lib/prisma.js";
+import { query, requireAuth } from "../lib/http.js";
 
-const router = Router();
+export const auditLogsRouter = Router();
 
-router.get("/", requireAuth("admin"), async (req: AuthRequest, res: Response): Promise<void> => {
-  const { page = "1", limit = "50", userId, entityType } = req.query as Record<string, string>;
-  const p = Math.max(1, parseInt(page));
-  const l = Math.min(100, Math.max(1, parseInt(limit)));
-  const skip = (p - 1) * l;
+auditLogsRouter.get("/", requireAuth(), async (req, res) => {
+  const entityType = query(req, "entityType") || undefined;
+  const search = query(req, "search") ?? "";
+  const page = Math.max(1, parseInt(query(req, "page") ?? "1") || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(query(req, "limit") ?? "20") || 20));
 
-  const where: Record<string, unknown> = {};
-  if (userId) where.userId = userId;
-  if (entityType) where.entityType = entityType;
+  const where = {
+    ...(entityType ? { entityType } : {}),
+    ...(search ? { action: { contains: search } } : {}),
+  };
 
   const [logs, total] = await Promise.all([
     prisma.auditLog.findMany({
       where,
-      skip,
-      take: l,
+      skip: (page - 1) * limit,
+      take: limit,
       orderBy: { createdAt: "desc" },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { name: true, email: true } } },
     }),
     prisma.auditLog.count({ where }),
   ]);
-
-  res.json({ logs, total, page: p, limit: l, pages: Math.ceil(total / l) });
+  res.json({ logs, total, page, limit, pages: Math.ceil(total / limit) });
 });
-
-export default router;

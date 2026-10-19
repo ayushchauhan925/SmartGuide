@@ -1,25 +1,34 @@
-import { prisma } from "./prisma";
+import { Prisma } from "@prisma/client";
+import { prisma } from "./prisma.js";
 
-interface AuditEvent {
-  userId?: string;
+export async function logAuditEvent({
+  userId,
+  action,
+  entityType,
+  entityId,
+  changes,
+  ipAddress,
+}: {
+  userId?: number;
   action: string;
   entityType: string;
-  entityId?: string;
+  entityId?: string | number;
   changes?: Record<string, unknown>;
   ipAddress?: string;
-}
-
-export async function logAuditEvent(event: AuditEvent): Promise<void> {
+}) {
   try {
     await prisma.auditLog.create({
       data: {
-        userId: event.userId ?? null,
-        action: event.action,
-        entityType: event.entityType,
-        entityId: event.entityId?.toString() ?? null,
-        changes: (event.changes as unknown as import("@prisma/client").Prisma.InputJsonValue) ?? undefined,
-        ipAddress: event.ipAddress ?? null,
+        userId: userId ?? null,
+        action,
+        entityType,
+        entityId: entityId?.toString() ?? null,
+        changes: (changes ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        ipAddress: ipAddress ?? null,
       },
     });
-  } catch { /* non-critical */ }
+  } catch {
+    // Audit logging failures should not break app flow
+    console.error("Audit log failed:", action, entityType, entityId);
+  }
 }

@@ -1,31 +1,34 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import path from "path";
 import fs from "fs";
+import { apiError } from "../lib/http.js";
 
-const router = Router();
+export const filesRouter = Router();
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR ? path.resolve(process.env.UPLOAD_DIR) : path.resolve("./uploads");
+const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR ?? "./uploads");
 
-// GET /uploads/:subDir/:filename — serve uploaded files
-router.get("/:subDir/:filename", (req: Request, res: Response): void => {
-  const { subDir, filename } = req.params;
+const MIME_MAP: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
+};
 
+/** Serves uploaded media. Supports Range requests so audio can seek. */
+filesRouter.get("/*path", (req, res) => {
+  const segments = (req.params as { path: string[] }).path;
+  const filePath = path.resolve(UPLOAD_DIR, ...segments);
   // Prevent path traversal
-  const safeSub = path.basename(subDir);
-  const safeFile = path.basename(filename);
-  const filePath = path.join(UPLOAD_DIR, safeSub, safeFile);
+  if (!filePath.startsWith(UPLOAD_DIR + path.sep)) return apiError(res, "Forbidden", "FORBIDDEN", 403);
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return apiError(res, "File not found", "NOT_FOUND", 404);
 
-  if (!filePath.startsWith(UPLOAD_DIR)) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: "File not found" });
-    return;
-  }
-
-  res.sendFile(filePath);
+  res.sendFile(filePath, {
+    headers: { "Content-Type": MIME_MAP[path.extname(filePath).toLowerCase()] ?? "application/octet-stream" },
+    maxAge: "365d",
+    immutable: true,
+  });
 });
-
-export default router;
