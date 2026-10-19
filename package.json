@@ -1,0 +1,13 @@
+{
+  "name": "smartguide",
+  "private": true,
+  "description": "Deployment entry point: installs, builds and starts backend/ and frontend/ as one service",
+  "scripts": {
+    "postinstall": "npm --prefix backend install --include=dev && npm --prefix frontend install --include=dev",
+    "build": "npm --prefix frontend run build && npm --prefix backend run build",
+    "start": "npm --prefix backend run deploy:start"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

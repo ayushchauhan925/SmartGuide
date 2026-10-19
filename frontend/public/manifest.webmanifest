@@ -1,0 +1,16 @@
+{
+  "name": "SmartGuide — Museum & Library Guide",
+  "short_name": "SmartGuide",
+  "description": "Scan QR codes to explore artefacts, artworks and exhibits",
+  "start_url": "/explore",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FAFAF8",
+  "theme_color": "#111110",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

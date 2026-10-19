@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# env files
+.env
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# uploads (local dev)
+/uploads/
+!/uploads/.gitkeep
+
+# prisma
+prisma/migrations/
+
+# leftovers from the old Next.js app (delete when VS Code is closed)
+/src/
+.next/
+
+# local tooling
+.claude/settings.local.json
+reset-mysql.ps1

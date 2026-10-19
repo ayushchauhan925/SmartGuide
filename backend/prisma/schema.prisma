@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  editor
+  viewer
+}
+
+enum ArtefactStatus {
+  active
+  inactive
+  draft
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  name         String
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(viewer)
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  auditLogs    AuditLog[]
+  versions     ArtefactVersion[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  artefacts   Artefact[]
+
+  @@map("categories")
+}
+
+model Location {
+  id           Int        @id @default(autoincrement())
+  name         String
+  type         String?
+  description  String?
+  floorPlanUrl String?    @map("floor_plan_url") @db.VarChar(500)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  artefacts   Artefact[]
+
+  @@map("locations")
+}
+
+model Artefact {
+  id             Int            @id @default(autoincrement())
+  uniquePublicId String         @unique @default(uuid()) @map("unique_public_id")
+  title          String
+  description    String?        @db.Text
+  metadata       Json?
+  categoryId     Int?           @map("category_id")
+  locationId     Int?           @map("location_id")
+  status         ArtefactStatus @default(active)
+  videoUrl       String?        @map("video_url") @db.VarChar(500)
+  modelUrl       String?        @map("model_url") @db.VarChar(500)
+  mapX           Float?         @map("map_x")
+  mapY           Float?         @map("map_y")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  category Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  location Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  images   ArtefactImage[]
+  audio    ArtefactAudio?
+  qrCode   QrCode?
+
+  translations ArtefactTranslation[]
+  scanEvents   ScanEvent[]
+  feedback     Feedback[]
+  tourStops    TourStop[]
+  versions     ArtefactVersion[]
+
+  @@index([uniquePublicId])
+  @@index([status])
+  @@map("artefacts")
+}
+
+model ArtefactImage {
+  id           Int      @id @default(autoincrement())
+  artefactId   Int      @map("artefact_id")
+  storagePath  String   @map("storage_path")
+  imageUrl     String   @map("image_url")
+  altText      String?  @map("alt_text")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+
+  @@index([artefactId, displayOrder])
+  @@map("artefact_images")
+}
+
+model ArtefactAudio {
+  id          Int      @id @default(autoincrement())
+  artefactId  Int      @unique @map("artefact_id")
+  storagePath String   @map("storage_path")
+  audioUrl    String   @map("audio_url")
+  duration    Int?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+
+  @@map("artefact_audio")
+}
+
+model QrCode {
+  id              Int       @id @default(autoincrement())
+  artefactId      Int       @unique @map("artefact_id")
+  uniqueShortCode String    @unique @map("unique_short_code")
+  publicUrl       String    @unique @map("public_url")
+  qrImagePath     String?   @map("qr_image_path")
+  isActive        Boolean   @default(true) @map("is_active")
+  scanCount       Int       @default(0) @map("scan_count")
+  lastScannedAt   DateTime? @map("last_scanned_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+
+  @@index([uniqueShortCode])
+  @@map("qr_codes")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?     @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  changes    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum FeedbackStatus {
+  pending
+  approved
+  hidden
+}
+
+model ArtefactTranslation {
+  id          Int      @id @default(autoincrement())
+  artefactId  Int      @map("artefact_id")
+  language    String   @db.VarChar(10)
+  title       String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+
+  @@unique([artefactId, language])
+  @@map("artefact_translations")
+}
+
+model ScanEvent {
+  id         Int      @id @default(autoincrement())
+  artefactId Int      @map("artefact_id")
+  device     String?  @db.VarChar(20)
+  language   String?  @db.VarChar(10)
+  referrer   String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+
+  @@index([artefactId, createdAt])
+  @@index([createdAt])
+  @@map("scan_events")
+}
+
+model Feedback {
+  id         Int            @id @default(autoincrement())
+  artefactId Int            @map("artefact_id")
+  rating     Int // 1 = helpful, -1 = not helpful
+  comment    String?        @db.Text
+  status     FeedbackStatus @default(pending)
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+
+  @@index([artefactId, status])
+  @@index([status, createdAt])
+  @@map("feedback")
+}
+
+model Tour {
+  id          Int        @id @default(autoincrement())
+  slug        String     @unique @default(uuid())
+  title       String
+  description String?    @db.Text
+  isPublished Boolean    @default(false) @map("is_published")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  stops       TourStop[]
+
+  @@map("tours")
+}
+
+model TourStop {
+  id         Int     @id @default(autoincrement())
+  tourId     Int     @map("tour_id")
+  artefactId Int     @map("artefact_id")
+  position   Int     @default(0)
+  note       String? @db.Text
+
+  tour     Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+
+  @@unique([tourId, artefactId])
+  @@index([tourId, position])
+  @@map("tour_stops")
+}
+
+model ArtefactVersion {
+  id         Int      @id @default(autoincrement())
+  artefactId Int      @map("artefact_id")
+  userId     Int?     @map("user_id")
+  snapshot   Json
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  artefact Artefact @relation(fields: [artefactId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([artefactId, createdAt])
+  @@map("artefact_versions")
+}
